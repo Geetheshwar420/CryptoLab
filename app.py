@@ -19,11 +19,8 @@ st.set_page_config(page_title="Crypto Lab", layout="wide")
 if "page" not in st.session_state:
     st.session_state.page = "intro"
 
-def show_intro():
-    st.session_state.page = "intro"
-
-def show_category(selected_category):
-    st.session_state.page = selected_category
+def set_page(selected_page):
+    st.session_state.page = selected_page
 
 # Introduction Page
 if st.session_state.page == "intro":
@@ -34,13 +31,14 @@ if st.session_state.page == "intro":
         - **Asymmetric Encryption** (e.g., RSA)
         - **Hash Functions** (e.g., SHA-256, MD5)
     """)
-    
+
     st.subheader("Choose a Cryptography Category to Start:")
-    category = st.radio("Select a category:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], on_change=lambda: show_category(category))
+    category = st.radio("Select a category:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], key="category_selection")
+    set_page(category)
 
 # Symmetric Encryption Page
 if st.session_state.page == "Symmetric Encryption":
-    st.button("⬅ Back", on_click=show_intro)
+    st.button("⬅ Back", on_click=lambda: set_page("intro"))
     st.subheader("Symmetric Encryption")
     algorithm = st.selectbox("Choose Algorithm:", ["AES", "DES"])
     message = st.text_input("Enter your plaintext:")
@@ -62,7 +60,7 @@ if st.session_state.page == "Symmetric Encryption":
 
 # Asymmetric Encryption Page
 if st.session_state.page == "Asymmetric Encryption":
-    st.button("⬅ Back", on_click=show_intro)
+    st.button("⬅ Back", on_click=lambda: set_page("intro"))
     st.subheader("Asymmetric Encryption")
     st.write("Generate a pair of RSA keys:")
     if st.button("Generate RSA Key Pair"):
@@ -82,7 +80,7 @@ if st.session_state.page == "Asymmetric Encryption":
 
 # Hashing Page
 if st.session_state.page == "Hashing":
-    st.button("⬅ Back", on_click=show_intro)
+    st.button("⬅ Back", on_click=lambda: set_page("intro"))
     st.subheader("Hash Functions")
     algo = st.selectbox("Choose a hashing algorithm:", ["SHA-256", "MD5"])
     message = st.text_input("Enter your plaintext:")
