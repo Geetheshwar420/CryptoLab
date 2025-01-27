@@ -1,6 +1,6 @@
 import streamlit as st
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding as asym_padding
 from cryptography.hazmat.primitives.asymmetric.ec import generate_private_key, SECP256R1
 from cryptography.hazmat.primitives.hashes import Hash, SHA256, SHA3_256, MD5, SHA1, SHA224, BLAKE2b, BLAKE2s
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -159,6 +159,7 @@ def rsa_decrypt(private_key, encrypted_message):
     return decrypted.decode()
 
 # ECDSA Key Pair generation
+# ECDSA Key Pair generation
 def ecdsa_key_pair():
     # Generate ECDSA key pair using SECP256R1 curve
     private_key = ec.generate_private_key(ec.SECP256R1(), backend=default_backend())
@@ -177,6 +178,7 @@ def ecdsa_key_pair():
     )
     
     return private_key, private_pem, public_pem  # Return all three
+
 
 def ecdsa_sign(private_key, message):
     # Sign the message using ECDSA
