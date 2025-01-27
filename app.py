@@ -15,20 +15,32 @@ except ModuleNotFoundError as e:
 # App configuration
 st.set_page_config(page_title="Crypto Lab", layout="wide")
 
+# State management
+if "page" not in st.session_state:
+    st.session_state.page = "intro"
+
+def show_intro():
+    st.session_state.page = "intro"
+
+def show_category(selected_category):
+    st.session_state.page = selected_category
+
 # Introduction Page
-st.title("Virtual Cryptographic Lab")
-st.write("""
-    Welcome to the Virtual Cryptographic Lab! This tool allows you to explore and experiment with cryptographic algorithms such as:
-    - **Symmetric Encryption** (e.g., AES, DES)
-    - **Asymmetric Encryption** (e.g., RSA)
-    - **Hash Functions** (e.g., SHA-256, MD5)
-""")
+if st.session_state.page == "intro":
+    st.title("Virtual Cryptographic Lab")
+    st.write("""
+        Welcome to the Virtual Cryptographic Lab! This tool allows you to explore and experiment with cryptographic algorithms such as:
+        - **Symmetric Encryption** (e.g., AES, DES)
+        - **Asymmetric Encryption** (e.g., RSA)
+        - **Hash Functions** (e.g., SHA-256, MD5)
+    """)
+    
+    st.subheader("Choose a Cryptography Category to Start:")
+    category = st.radio("Select a category:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], on_change=lambda: show_category(category))
 
-# Navigation Options
-st.subheader("Choose a Cryptography Category to Start:")
-category = st.radio("Select a category:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"])
-
-if category == "Symmetric Encryption":
+# Symmetric Encryption Page
+if st.session_state.page == "Symmetric Encryption":
+    st.button("⬅ Back", on_click=show_intro)
     st.subheader("Symmetric Encryption")
     algorithm = st.selectbox("Choose Algorithm:", ["AES", "DES"])
     message = st.text_input("Enter your plaintext:")
@@ -48,7 +60,9 @@ if category == "Symmetric Encryption":
         except Exception as e:
             st.error(f"Error: {e}")
 
-elif category == "Asymmetric Encryption":
+# Asymmetric Encryption Page
+if st.session_state.page == "Asymmetric Encryption":
+    st.button("⬅ Back", on_click=show_intro)
     st.subheader("Asymmetric Encryption")
     st.write("Generate a pair of RSA keys:")
     if st.button("Generate RSA Key Pair"):
@@ -66,7 +80,9 @@ elif category == "Asymmetric Encryption":
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         ).decode())
 
-elif category == "Hashing":
+# Hashing Page
+if st.session_state.page == "Hashing":
+    st.button("⬅ Back", on_click=show_intro)
     st.subheader("Hash Functions")
     algo = st.selectbox("Choose a hashing algorithm:", ["SHA-256", "MD5"])
     message = st.text_input("Enter your plaintext:")
