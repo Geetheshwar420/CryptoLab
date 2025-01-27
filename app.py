@@ -13,11 +13,9 @@ def introduction():
     category = st.radio(
         "Select a Category to Explore:",
         ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"],
-        key="category_selection"
+        key="category_selection",
+        on_change=lambda: navigate_to(st.session_state.category_selection)
     )
-    
-    if st.button("Go to Selected Category"):
-        navigate_to(category)
 
 # Symmetric Encryption Page
 def symmetric_encryption():
