@@ -198,6 +198,9 @@ def introduction():
 
 
 def symmetric_page():
+    if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
+        
     st.title("Symmetric Encryption")
     algo = st.selectbox("Choose Algorithm:", ["AES", "DES", "ChaCha20", "RC4", "Blowfish", "CAST5"])
     mode = st.selectbox("Choose Mode (if applicable):", ["ECB", "CBC", None])
@@ -221,11 +224,13 @@ def symmetric_page():
         except Exception as e:
             st.error(f"Error: {e}")
 
-    if st.button("Back to Home"):
-        st.session_state.current_page = "Introduction"
+
 
 
 def asymmetric_page():
+    if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
+        
     st.title("Asymmetric Encryption (RSA & ECDSA)")
     action = st.radio("Select Action:", ["Generate RSA Key Pair", "Generate ECDSA Key Pair", "Sign with RSA", "Verify with RSA", "Sign with ECDSA", "Verify with ECDSA"])
 
@@ -277,20 +282,19 @@ def asymmetric_page():
             else:
                 st.error("Signature is invalid!")
 
-    if st.button("Back to Home"):
-        st.session_state.current_page = "Introduction"
+    
 
 
 def hashing_page():
+     if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
+    
     st.title("Hashing Algorithms")
     hash_algo = st.selectbox("Choose a Hashing Algorithm:", ["SHA-256", "SHA-3-256", "MD5", "SHA1", "SHA224", "BLAKE2b", "BLAKE2s"])
     message = st.text_input("Enter message:")
     if st.button("Generate Hash"):
         hash_value = generate_hash(message, hash_algo)
         st.success(f"Hash ({hash_algo}): {hash_value}")
-
-    if st.button("Back to Home"):
-        st.session_state.current_page = "Introduction"
 
 
 # Main function to control navigation
