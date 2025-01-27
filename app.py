@@ -161,9 +161,6 @@ def generate_hash(message, algorithm):
 # Introduction Page
 def introduction():
     st.title("Comprehensive Cryptographic Lab")
-    # Back button at the top of the page
-    if st.button("⬅ Back"):
-        navigate_to("Introduction")
     st.write("Explore Symmetric Encryption, Asymmetric Encryption, and Hashing Algorithms.")
     
     category = st.radio("Select a Category to Explore:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], key="category")
