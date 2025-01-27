@@ -1,31 +1,34 @@
-import streamlit as st
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import serialization
-import base64
-import os
+try:
+    import streamlit as st
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import serialization
+    import base64
+    import os
+except ModuleNotFoundError as e:
+    print("Error: Required module not found. Ensure you have 'streamlit' and 'cryptography' installed.")
+    print("Use: pip install streamlit cryptography")
+    raise
 
 # App configuration
 st.set_page_config(page_title="Crypto Lab", layout="wide")
 
 # Introduction Page
 st.title("Virtual Cryptographic Lab")
-st.sidebar.header("Navigate")
-pages = ["Introduction", "Symmetric Encryption", "Asymmetric Encryption", "Hashing"]
-choice = st.sidebar.radio("Choose a category:", pages)
+st.write("""
+    Welcome to the Virtual Cryptographic Lab! This tool allows you to explore and experiment with cryptographic algorithms such as:
+    - **Symmetric Encryption** (e.g., AES, DES)
+    - **Asymmetric Encryption** (e.g., RSA)
+    - **Hash Functions** (e.g., SHA-256, MD5)
+""")
 
-if choice == "Introduction":
-    st.subheader("Welcome to the Virtual Cryptographic Lab!")
-    st.write("""
-        This tool allows you to explore and experiment with cryptographic algorithms such as:
-        - Symmetric Encryption (AES, DES)
-        - Asymmetric Encryption (RSA)
-        - Hash Functions (SHA-256, MD5)
-    """)
+# Navigation Options
+st.subheader("Choose a Cryptography Category to Start:")
+category = st.radio("Select a category:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"])
 
-elif choice == "Symmetric Encryption":
+if category == "Symmetric Encryption":
     st.subheader("Symmetric Encryption")
     algorithm = st.selectbox("Choose Algorithm:", ["AES", "DES"])
     message = st.text_input("Enter your plaintext:")
@@ -45,7 +48,7 @@ elif choice == "Symmetric Encryption":
         except Exception as e:
             st.error(f"Error: {e}")
 
-elif choice == "Asymmetric Encryption":
+elif category == "Asymmetric Encryption":
     st.subheader("Asymmetric Encryption")
     st.write("Generate a pair of RSA keys:")
     if st.button("Generate RSA Key Pair"):
@@ -63,7 +66,7 @@ elif choice == "Asymmetric Encryption":
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         ).decode())
 
-elif choice == "Hashing":
+elif category == "Hashing":
     st.subheader("Hash Functions")
     algo = st.selectbox("Choose a hashing algorithm:", ["SHA-256", "MD5"])
     message = st.text_input("Enter your plaintext:")
