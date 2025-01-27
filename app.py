@@ -161,6 +161,9 @@ def generate_hash(message, algorithm):
 # Introduction Page
 def introduction():
     st.title("Comprehensive Cryptographic Lab")
+    # Back button at the top of the page
+    if st.button("⬅ Back"):
+        navigate_to("Introduction")
     st.write("Explore Symmetric Encryption, Asymmetric Encryption, and Hashing Algorithms.")
     
     category = st.radio("Select a Category to Explore:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], key="category")
@@ -169,6 +172,10 @@ def introduction():
 
 # Symmetric Encryption Page
 def symmetric_page():
+    # Back button at the top of the page
+    if st.button("⬅ Back"):
+        navigate_to("Introduction")
+
     st.title("Symmetric Encryption")
     algo = st.selectbox("Choose Algorithm:", ["AES", "DES", "ChaCha20", "RC4", "Blowfish", "CAST5"])
     mode = st.selectbox("Choose Mode (if applicable):", ["ECB", "CBC", None])
@@ -192,11 +199,12 @@ def symmetric_page():
         except Exception as e:
             st.error(f"Error: {e}")
 
+# Asymmetric Encryption Page
+def asymmetric_page():
+    # Back button at the top of the page
     if st.button("⬅ Back"):
         navigate_to("Introduction")
 
-# Asymmetric Encryption Page
-def asymmetric_page():
     st.title("Asymmetric Encryption")
     
     action = st.radio("Select Action:", ["Generate RSA Key Pair", "Encrypt with RSA", "Decrypt with RSA", "Generate ECDSA Key Pair", "Encrypt with ECDSA", "Decrypt with ECDSA"])
@@ -227,11 +235,12 @@ def asymmetric_page():
             decrypted_message = rsa_decrypt(st.session_state.private_key, encrypted_message)
             st.success(f"Decrypted Message: {decrypted_message}")
 
+# Hashing Page
+def hashing_page():
+    # Back button at the top of the page
     if st.button("⬅ Back"):
         navigate_to("Introduction")
 
-# Hashing Page
-def hashing_page():
     st.title("Hashing")
     algo = st.selectbox("Choose Algorithm:", ["SHA-256", "SHA-3-256", "MD5", "SHA1", "SHA224", "BLAKE2b", "BLAKE2s"])
     message = st.text_input("Enter message:")
@@ -241,9 +250,6 @@ def hashing_page():
             st.success(f"Hash: {result}")
         except Exception as e:
             st.error(f"Error: {e}")
-
-    if st.button("⬅ Back"):
-        navigate_to("Introduction")
 
 # Main
 if "current_page" not in st.session_state:
