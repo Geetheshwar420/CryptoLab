@@ -1,9 +1,12 @@
 import streamlit as st
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
+from cryptography.hazmat.primitives.asymmetric.ec import generate_private_key, SECP256R1
+from cryptography.hazmat.primitives.hashes import Hash, SHA256, SHA3_256, MD5
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
-from cryptography.hazmat.primitives.hashes import SHA256, MD5
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from base64 import b64encode, b64decode
 import os
 
@@ -11,37 +14,86 @@ import os
 def navigate_to(page):
     st.session_state.current_page = page
 
+# Helper function to derive a key
+def derive_key(password, algo="PBKDF2", salt=None):
+    if not salt:
+        salt = os.urandom(16)
+    if algo == "PBKDF2":
+        kdf = PBKDF2HMAC(
+            algorithm=SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+    elif algo == "scrypt":
+        kdf = Scrypt(
+            salt=salt,
+            length=32,
+            n=2**14,
+            r=8,
+            p=1,
+            backend=default_backend()
+        )
+    else:
+        raise ValueError("Unsupported Key Derivation Function")
+
+    key = kdf.derive(password.encode())
+    return key, salt
+
 # Symmetric Encryption Algorithms
-def symmetric_encrypt(algorithm, message, key):
+def symmetric_encrypt(algorithm, mode, message, key, iv=None):
     if algorithm == "AES":
-        cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+        cipher_algo = algorithms.AES(key)
     elif algorithm == "DES":
-        cipher = Cipher(algorithms.TripleDES(key), modes.ECB(), backend=default_backend())
+        cipher_algo = algorithms.TripleDES(key)
+    elif algorithm == "ChaCha20":
+        cipher_algo = algorithms.ChaCha20(key, iv)
     else:
         raise ValueError("Unsupported Algorithm")
+
+    if algorithm == "ChaCha20":
+        cipher = Cipher(cipher_algo, mode=None, backend=default_backend())
+    else:
+        cipher = Cipher(cipher_algo, mode, backend=default_backend())
 
     encryptor = cipher.encryptor()
-    padder = padding.PKCS7(cipher.algorithm.block_size).padder()
-    padded_message = padder.update(message.encode()) + padder.finalize()
-    encrypted = encryptor.update(padded_message) + encryptor.finalize()
+    if mode:
+        padder = padding.PKCS7(cipher_algo.block_size).padder()
+        padded_message = padder.update(message.encode()) + padder.finalize()
+        encrypted = encryptor.update(padded_message) + encryptor.finalize()
+    else:
+        encrypted = encryptor.update(message.encode()) + encryptor.finalize()
+
     return b64encode(encrypted).decode()
 
-def symmetric_decrypt(algorithm, encrypted_message, key):
+def symmetric_decrypt(algorithm, mode, encrypted_message, key, iv=None):
     if algorithm == "AES":
-        cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+        cipher_algo = algorithms.AES(key)
     elif algorithm == "DES":
-        cipher = Cipher(algorithms.TripleDES(key), modes.ECB(), backend=default_backend())
+        cipher_algo = algorithms.TripleDES(key)
+    elif algorithm == "ChaCha20":
+        cipher_algo = algorithms.ChaCha20(key, iv)
     else:
         raise ValueError("Unsupported Algorithm")
 
+    if algorithm == "ChaCha20":
+        cipher = Cipher(cipher_algo, mode=None, backend=default_backend())
+    else:
+        cipher = Cipher(cipher_algo, mode, backend=default_backend())
+
     decryptor = cipher.decryptor()
-    unpadder = padding.PKCS7(cipher.algorithm.block_size).unpadder()
-    decrypted_padded = decryptor.update(b64decode(encrypted_message)) + decryptor.finalize()
-    decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
+    if mode:
+        unpadder = padding.PKCS7(cipher_algo.block_size).unpadder()
+        decrypted_padded = decryptor.update(b64decode(encrypted_message)) + decryptor.finalize()
+        decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
+    else:
+        decrypted = decryptor.update(b64decode(encrypted_message)) + decryptor.finalize()
+
     return decrypted.decode()
 
-# Asymmetric Encryption (RSA)
-def generate_rsa_key_pair():
+# Asymmetric Encryption Algorithms
+def rsa_key_pair():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
     public_key = private_key.public_key()
     return private_key, public_key
@@ -66,127 +118,79 @@ def rsa_decrypt(private_key, encrypted_message):
         )
     ).decode()
 
-# Hashing
-def generate_hash(algo, message):
-    if algo == "SHA-256":
-        hasher = SHA256()
-    elif algo == "MD5":
-        hasher = MD5()
+# Hashing Algorithms
+def generate_hash(message, algorithm):
+    if algorithm == "SHA-256":
+        digest = Hash(SHA256(), backend=default_backend())
+    elif algorithm == "SHA-3-256":
+        digest = Hash(SHA3_256(), backend=default_backend())
+    elif algorithm == "MD5":
+        digest = Hash(MD5(), backend=default_backend())
     else:
-        raise ValueError("Unsupported Algorithm")
+        raise ValueError("Unsupported Hash Algorithm")
 
-    digest = hashes.Hash(hasher, backend=default_backend())
     digest.update(message.encode())
     return digest.finalize().hex()
 
 # Introduction Page
 def introduction():
-    st.title("Virtual Cryptographic Lab")
+    st.title("Comprehensive Cryptographic Lab")
     st.write("Explore Symmetric Encryption, Asymmetric Encryption, and Hashing Algorithms.")
     
-    # Navigation Options
-    category = st.radio(
-        "Select a Category to Explore:",
-        ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"],
-        key="category_selection"
-    )
-    
+    category = st.radio("Select a Category to Explore:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], key="category")
     if st.button("Go to Selected Category"):
         navigate_to(category)
 
 # Symmetric Encryption Page
-def symmetric_encryption():
+def symmetric_page():
     st.title("Symmetric Encryption")
-    st.write("Perform encryption and decryption using symmetric algorithms like AES and DES.")
-    
-    # Inputs
-    algorithm = st.selectbox("Choose Algorithm:", ["AES", "DES"])
-    message = st.text_input("Enter your plaintext:")
-    key = st.text_input("Enter your key (16 bytes for AES, 8/24 bytes for DES):", type="password")
+    algo = st.selectbox("Choose Algorithm:", ["AES", "DES", "ChaCha20"])
+    mode = st.selectbox("Choose Mode (if applicable):", ["ECB", "CBC", None])
+    message = st.text_input("Enter plaintext:")
+    key = st.text_input("Enter key (16 bytes for AES, 8/24 bytes for DES):", type="password")
+    iv = st.text_input("Enter IV (if needed):", type="password")
     encrypt = st.button("Encrypt")
     decrypt = st.button("Decrypt")
-    
-    if st.button("⬅ Back"):
-        navigate_to("Introduction")
-    
+
     if encrypt:
         try:
-            if (algorithm == "AES" and len(key) != 16) or (algorithm == "DES" and len(key) not in [8, 24]):
-                st.error(f"Invalid key length for {algorithm}.")
-            else:
-                encrypted_message = symmetric_encrypt(algorithm, message, key.encode())
-                st.success(f"Encrypted Message: {encrypted_message}")
+            result = symmetric_encrypt(algo, modes.CBC(b64decode(iv.encode())) if iv else None, message, b64decode(key.encode()))
+            st.success(f"Encrypted: {result}")
         except Exception as e:
-            st.error(f"Encryption Error: {e}")
-    
+            st.error(f"Error: {e}")
+
     if decrypt:
         try:
-            decrypted_message = symmetric_decrypt(algorithm, message, key.encode())
-            st.success(f"Decrypted Message: {decrypted_message}")
+            result = symmetric_decrypt(algo, modes.CBC(b64decode(iv.encode())) if iv else None, message, b64decode(key.encode()))
+            st.success(f"Decrypted: {result}")
         except Exception as e:
-            st.error(f"Decryption Error: {e}")
+            st.error(f"Error: {e}")
 
-# Asymmetric Encryption Page
-def asymmetric_encryption():
-    st.title("Asymmetric Encryption")
-    st.write("Generate RSA key pairs and perform encryption and decryption.")
-    
-    if "rsa_keys" not in st.session_state:
-        st.session_state.rsa_keys = None
-    
-    if st.button("Generate RSA Key Pair"):
-        private_key, public_key = generate_rsa_key_pair()
-        st.session_state.rsa_keys = {"private_key": private_key, "public_key": public_key}
-        st.success("RSA Key Pair Generated Successfully.")
-    
-    message = st.text_input("Enter message to encrypt:")
-    if st.session_state.rsa_keys and message and st.button("Encrypt"):
-        try:
-            public_key = st.session_state.rsa_keys["public_key"]
-            encrypted_message = rsa_encrypt(public_key, message)
-            st.success(f"Encrypted Message: {encrypted_message}")
-        except Exception as e:
-            st.error(f"Encryption Error: {e}")
-
-    encrypted_message = st.text_area("Enter the encrypted message to decrypt:")
-    if st.session_state.rsa_keys and encrypted_message and st.button("Decrypt"):
-        try:
-            private_key = st.session_state.rsa_keys["private_key"]
-            decrypted_message = rsa_decrypt(private_key, encrypted_message)
-            st.success(f"Decrypted Message: {decrypted_message}")
-        except Exception as e:
-            st.error(f"Decryption Error: {e}")
-    
     if st.button("⬅ Back"):
         navigate_to("Introduction")
 
 # Hashing Page
-def hashing():
+def hashing_page():
     st.title("Hashing")
-    st.write("Generate hashes using SHA-256 or MD5.")
-    
-    message = st.text_input("Enter the message to hash:")
-    algo = st.selectbox("Choose Hash Algorithm:", ["SHA-256", "MD5"])
-    
+    algo = st.selectbox("Choose Algorithm:", ["SHA-256", "SHA-3-256", "MD5"])
+    message = st.text_input("Enter message:")
     if st.button("Generate Hash"):
         try:
-            hash_value = generate_hash(algo, message)
-            st.success(f"Generated Hash: {hash_value}")
+            result = generate_hash(message, algo)
+            st.success(f"Hash: {result}")
         except Exception as e:
-            st.error(f"Hashing Error: {e}")
-    
+            st.error(f"Error: {e}")
+
     if st.button("⬅ Back"):
         navigate_to("Introduction")
 
-# Main App
+# Main
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Introduction"
 
 if st.session_state.current_page == "Introduction":
     introduction()
 elif st.session_state.current_page == "Symmetric Encryption":
-    symmetric_encryption()
-elif st.session_state.current_page == "Asymmetric Encryption":
-    asymmetric_encryption()
+    symmetric_page()
 elif st.session_state.current_page == "Hashing":
-    hashing()
+    hashing_page()
