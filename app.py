@@ -33,12 +33,13 @@ if st.session_state.page == "intro":
     """)
 
     st.subheader("Choose a Cryptography Category to Start:")
-    st.radio(
+    category = st.radio(
         "Select a category:",
         ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"],
-        key="category_selection",
-        on_change=lambda: set_page(st.session_state.category_selection)
+        key="category_selection"
     )
+    if st.button("Go to Selected Category"):
+        set_page(category)
 
 # Symmetric Encryption Page
 if st.session_state.page == "Symmetric Encryption":
@@ -52,16 +53,21 @@ if st.session_state.page == "Symmetric Encryption":
     execute = st.button("Encrypt/Decrypt")
 
     if execute:
-        try:
-            if algorithm == "AES":
-                cipher = Cipher(algorithms.AES(key.encode()), modes.ECB())
-                encryptor = cipher.encryptor()
-                ciphertext = encryptor.update(message.encode()) + encryptor.finalize()
-                st.success(f"Ciphertext: {base64.b64encode(ciphertext).decode()}")
-            else:
-                st.warning("DES implementation coming soon!")
-        except Exception as e:
-            st.error(f"Error: {e}")
+        if not message:
+            st.error("Please enter a plaintext message.")
+        elif algorithm == "AES" and len(key) != 16:
+            st.error("Key must be exactly 16 bytes for AES.")
+        else:
+            try:
+                if algorithm == "AES":
+                    cipher = Cipher(algorithms.AES(key.encode()), modes.ECB())
+                    encryptor = cipher.encryptor()
+                    ciphertext = encryptor.update(message.encode()) + encryptor.finalize()
+                    st.success(f"Ciphertext: {base64.b64encode(ciphertext).decode()}")
+                else:
+                    st.warning("DES implementation coming soon!")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # Asymmetric Encryption Page
 if st.session_state.page == "Asymmetric Encryption":
@@ -94,10 +100,16 @@ if st.session_state.page == "Hashing":
     execute = st.button("Generate Hash")
 
     if execute:
-        if algo == "SHA-256":
-            digest = hashes.Hash(hashes.SHA256())
-        elif algo == "MD5":
-            digest = hashes.Hash(hashes.MD5())
-        digest.update(message.encode())
-        hash_value = digest.finalize()
-        st.success(f"Hash Value: {hash_value.hex()}")
+        if not message:
+            st.error("Please enter a plaintext message.")
+        else:
+            try:
+                if algo == "SHA-256":
+                    digest = hashes.Hash(hashes.SHA256())
+                elif algo == "MD5":
+                    digest = hashes.Hash(hashes.MD5())
+                digest.update(message.encode())
+                hash_value = digest.finalize()
+                st.success(f"Hash Value: {hash_value.hex()}")
+            except Exception as e:
+                st.error(f"Error: {e}")
