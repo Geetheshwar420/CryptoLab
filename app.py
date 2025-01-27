@@ -9,6 +9,21 @@ from base64 import b64encode, b64decode
 def navigate_to(page):
     st.session_state.current_page = page
 
+# Introduction Page
+def introduction():
+    st.title("Virtual Cryptographic Lab")
+    st.write("Explore Symmetric Encryption, Asymmetric Encryption, and Hashing Algorithms.")
+    
+    # Navigation Options
+    category = st.radio(
+        "Select a Category to Explore:",
+        ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"],
+        key="category_selection"
+    )
+    
+    if st.button("Go to Selected Category"):
+        navigate_to(category)
+
 # Asymmetric Encryption Algorithms
 def rsa_key_pair():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -95,6 +110,7 @@ def asymmetric_page():
 if "current_page" not in st.session_state:
     st.session_state.current_page = "Introduction"
 
+# Page Routing
 if st.session_state.current_page == "Introduction":
     introduction()
 elif st.session_state.current_page == "Symmetric Encryption":
