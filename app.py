@@ -158,9 +158,10 @@ def rsa_decrypt(private_key, encrypted_message):
     )
     return decrypted.decode()
 
+# ECDSA Key Pair generation
 def ecdsa_key_pair():
     # Generate ECDSA key pair using SECP256R1 curve
-    private_key = generate_private_key(SECP256R1(), backend=default_backend())
+    private_key = ec.generate_private_key(ec.SECP256R1(), backend=default_backend())
     public_key = private_key.public_key()
     
     # Serialize the private key and public key (in PEM format)
@@ -175,7 +176,7 @@ def ecdsa_key_pair():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     
-    return private_pem, public_pem
+    return private_key, private_pem, public_pem  # Return all three
 
 def ecdsa_sign(private_key, message):
     # Sign the message using ECDSA
@@ -290,7 +291,7 @@ def asymmetric_page():
 
     elif action == "Generate ECDSA Key Pair":
         if st.button("Generate"):
-            private_key, private_pem, public_pem = ecdsa_key_pair()
+            private_key, private_pem, public_pem = ecdsa_key_pair()  # Unpacking 3 values
             st.session_state.private_key = private_key
             st.session_state.private_pem = private_pem
             st.session_state.public_key = public_pem
