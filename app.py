@@ -221,6 +221,9 @@ def symmetric_page():
         except Exception as e:
             st.error(f"Error: {e}")
 
+    if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
+
 
 def asymmetric_page():
     st.title("Asymmetric Encryption (RSA & ECDSA)")
@@ -274,6 +277,9 @@ def asymmetric_page():
             else:
                 st.error("Signature is invalid!")
 
+    if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
+
 
 def hashing_page():
     st.title("Hashing Algorithms")
@@ -282,6 +288,9 @@ def hashing_page():
     if st.button("Generate Hash"):
         hash_value = generate_hash(message, hash_algo)
         st.success(f"Hash ({hash_algo}): {hash_value}")
+
+    if st.button("Back to Home"):
+        st.session_state.current_page = "Introduction"
 
 
 # Main function to control navigation
