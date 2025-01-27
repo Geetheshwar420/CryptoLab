@@ -1,2 +1,3 @@
 streamlit==1.25.0  
 pycryptodome==3.18.0 
+Crypto
