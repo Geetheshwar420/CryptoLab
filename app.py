@@ -1,22 +1,36 @@
 import streamlit as st
-from Crypto.Cipher import AES, DES
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.Random import get_random_bytes
-from hashlib import sha256, md5
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from base64 import b64encode, b64decode
+import os
 
 # Helper function for navigation
 def navigate_to(page):
     st.session_state.current_page = page
 
-# Helper function for padding (AES and DES require fixed block sizes)
-def pad(text, block_size=16):
-    padding_length = block_size - len(text) % block_size
-    return text + chr(padding_length) * padding_length
+# Helper function for AES encryption
+def aes_encrypt(message, key):
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=backend)
+    encryptor = cipher.encryptor()
+    padder = padding.PKCS7(algorithms.AES.block_size).padder()
+    padded_message = padder.update(message.encode()) + padder.finalize()
+    encrypted = encryptor.update(padded_message) + encryptor.finalize()
+    return b64encode(encrypted).decode()
 
-def unpad(text):
-    padding_length = ord(text[-1])
-    return text[:-padding_length]
+def aes_decrypt(encrypted_message, key):
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=backend)
+    decryptor = cipher.decryptor()
+    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+    decrypted_padded = decryptor.update(b64decode(encrypted_message)) + decryptor.finalize()
+    decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
+    return decrypted.decode()
 
 # Introduction Page
 def introduction():
@@ -36,39 +50,34 @@ def introduction():
 # Symmetric Encryption Page
 def symmetric_encryption():
     st.title("Symmetric Encryption")
-    st.write("Perform encryption and decryption using symmetric algorithms like AES and DES.")
+    st.write("Perform encryption and decryption using AES.")
     
     # Inputs
-    algorithm = st.selectbox("Choose Algorithm:", ["AES", "DES"])
     message = st.text_input("Enter your plaintext:")
-    key = st.text_input("Enter your key (16 bytes for AES, 8 bytes for DES):")
-    execute = st.button("Encrypt")
+    key_input = st.text_input("Enter your key (16 characters):", type="password")
+    encrypt = st.button("Encrypt")
+    decrypt = st.button("Decrypt")
     
     # Back Button
     if st.button("⬅ Back"):
         navigate_to("Introduction")
     
-    # Process Encryption
-    if execute:
-        try:
-            if algorithm == "AES" and len(key) != 16:
-                st.error("Key must be 16 bytes for AES.")
-            elif algorithm == "DES" and len(key) != 8:
-                st.error("Key must be 8 bytes for DES.")
-            else:
-                if algorithm == "AES":
-                    cipher = AES.new(key.encode(), AES.MODE_ECB)
-                elif algorithm == "DES":
-                    cipher = DES.new(key.encode(), DES.MODE_ECB)
-                
-                encrypted = cipher.encrypt(pad(message).encode())
-                st.success(f"Encrypted Message: {encrypted.hex()}")
-
-                if st.button("Decrypt"):
-                    decrypted = unpad(cipher.decrypt(bytes.fromhex(encrypted.hex())).decode())
-                    st.success(f"Decrypted Message: {decrypted}")
-        except Exception as e:
-            st.error(f"Error: {e}")
+    if key_input and len(key_input) == 16:
+        key = key_input.encode()
+        if encrypt and message:
+            try:
+                encrypted_message = aes_encrypt(message, key)
+                st.success(f"Encrypted Message: {encrypted_message}")
+            except Exception as e:
+                st.error(f"Encryption Error: {e}")
+        elif decrypt and message:
+            try:
+                decrypted_message = aes_decrypt(message, key)
+                st.success(f"Decrypted Message: {decrypted_message}")
+            except Exception as e:
+                st.error(f"Decryption Error: {e}")
+    elif key_input:
+        st.error("Key must be exactly 16 characters.")
 
 # Asymmetric Encryption Page
 def asymmetric_encryption():
@@ -79,25 +88,42 @@ def asymmetric_encryption():
         st.session_state.rsa_key = None
     
     if st.button("Generate RSA Key Pair"):
-        key = RSA.generate(2048)
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
         st.session_state.rsa_key = key
-        st.success("Keys generated successfully.")
-        st.text(f"Public Key (PEM):\n{key.publickey().export_key().decode()}")
-
+        st.success("RSA Key Pair Generated Successfully.")
+        st.text(f"Public Key: {key.public_key().public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo).decode()}")
+    
     message = st.text_input("Enter message to encrypt:")
     if st.session_state.rsa_key and message and st.button("Encrypt"):
         try:
-            public_key = st.session_state.rsa_key.publickey()
-            cipher = PKCS1_OAEP.new(public_key)
-            encrypted = cipher.encrypt(message.encode())
-            st.success(f"Encrypted Message: {encrypted.hex()}")
-
-            if st.button("Decrypt"):
-                cipher = PKCS1_OAEP.new(st.session_state.rsa_key)
-                decrypted = cipher.decrypt(bytes.fromhex(encrypted.hex())).decode()
-                st.success(f"Decrypted Message: {decrypted}")
+            public_key = st.session_state.rsa_key.public_key()
+            encrypted = public_key.encrypt(
+                message.encode(),
+                asym_padding.OAEP(
+                    mgf=asym_padding.MGF1(algorithm=SHA256()),
+                    algorithm=SHA256(),
+                    label=None
+                )
+            )
+            st.success(f"Encrypted Message: {b64encode(encrypted).decode()}")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Encryption Error: {e}")
+
+    if st.session_state.rsa_key and st.button("Decrypt"):
+        try:
+            private_key = st.session_state.rsa_key
+            encrypted_message = st.text_area("Enter the encrypted message:")
+            decrypted = private_key.decrypt(
+                b64decode(encrypted_message),
+                asym_padding.OAEP(
+                    mgf=asym_padding.MGF1(algorithm=SHA256()),
+                    algorithm=SHA256(),
+                    label=None
+                )
+            )
+            st.success(f"Decrypted Message: {decrypted.decode()}")
+        except Exception as e:
+            st.error(f"Decryption Error: {e}")
     
     # Back Button
     if st.button("⬅ Back"):
@@ -114,10 +140,14 @@ def hashing():
     if st.button("Generate Hash"):
         if message:
             if algo == "SHA-256":
-                hash_result = sha256(message.encode()).hexdigest()
+                hash_result = hashes.Hash(hashes.SHA256(), backend=default_backend())
+                hash_result.update(message.encode())
+                result = hash_result.finalize()
             elif algo == "MD5":
-                hash_result = md5(message.encode()).hexdigest()
-            st.success(f"Generated Hash: {hash_result}")
+                hash_result = hashes.Hash(hashes.MD5(), backend=default_backend())
+                hash_result.update(message.encode())
+                result = hash_result.finalize()
+            st.success(f"Generated Hash: {result.hex()}")
         else:
             st.error("Please enter a message to hash.")
     
