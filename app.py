@@ -11,22 +11,6 @@ import os
 import base64
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
-hide_github_button_style = """
-[data-testid="stGitButton"] {
-    visibility: hidden;
-}
-"""
-
-st.markdown(hide_github_button_style, unsafe_allow_html=True)
-
-hide_fork_button_style = """
-[data-testid="stForkButton"] {
-    visibility: hidden;
-}
-"""
-
-st.markdown(hide_fork_button_style, unsafe_allow_html=True)
-
 
 # Symmetric Encryption Algorithms
 def symmetric_encrypt(algorithm, mode, message, key, iv=None):
