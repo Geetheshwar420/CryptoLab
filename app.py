@@ -10,6 +10,8 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from base64 import b64encode, b64decode
 import os
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+
 
 # Helper function for navigation
 def navigate_to(page):
@@ -105,36 +107,95 @@ def symmetric_decrypt(algorithm, mode, encrypted_message, key, iv=None):
 
     return decrypted.decode()
 
-# Asymmetric Encryption Algorithms
+# Asymmetric Encryption Algorithms (Updated)
 def rsa_key_pair():
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+    # Generate RSA private key
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    
+    # Generate the corresponding public key
     public_key = private_key.public_key()
-    return private_key, public_key
+    
+    # Serialize the private key (to PEM format)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    
+    # Serialize the public key (to PEM format)
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    
+    return private_pem, public_pem
 
 def rsa_encrypt(public_key, message):
-    return b64encode(public_key.encrypt(
+    # Encrypt message using RSA public key
+    encrypted = public_key.encrypt(
         message.encode(),
         asym_padding.OAEP(
             mgf=asym_padding.MGF1(algorithm=SHA256()),
             algorithm=SHA256(),
             label=None
         )
-    )).decode()
+    )
+    return b64encode(encrypted).decode()
 
 def rsa_decrypt(private_key, encrypted_message):
-    return private_key.decrypt(
+    # Decrypt message using RSA private key
+    decrypted = private_key.decrypt(
         b64decode(encrypted_message),
         asym_padding.OAEP(
             mgf=asym_padding.MGF1(algorithm=SHA256()),
             algorithm=SHA256(),
             label=None
         )
-    ).decode()
+    )
+    return decrypted.decode()
 
 def ecdsa_key_pair():
+    # Generate ECDSA key pair using SECP256R1 curve
     private_key = generate_private_key(SECP256R1(), backend=default_backend())
     public_key = private_key.public_key()
-    return private_key, public_key
+    
+    # Serialize the private key and public key (in PEM format)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    
+    return private_pem, public_pem
+
+def ecdsa_sign(private_key, message):
+    # Sign the message using ECDSA
+    signature = private_key.sign(
+        message.encode(),
+        ec.ECDSA(hashes.SHA256())
+    )
+    return b64encode(signature).decode()
+
+def ecdsa_verify(public_key, message, signature):
+    # Verify the signature of the message using ECDSA
+    try:
+        public_key.verify(
+            b64decode(signature),
+            message.encode(),
+            ec.ECDSA(hashes.SHA256())
+        )
+        return "Signature is valid!"
+    except Exception as e:
+        return f"Signature verification failed: {str(e)}"
 
 # Hashing Algorithms
 def generate_hash(message, algorithm):
@@ -204,21 +265,16 @@ def asymmetric_page():
 
     st.title("Asymmetric Encryption")
     
-    action = st.radio("Select Action:", ["Generate RSA Key Pair", "Encrypt with RSA", "Decrypt with RSA", "Generate ECDSA Key Pair", "Encrypt with ECDSA", "Decrypt with ECDSA"])
+    action = st.radio("Select Action:", ["Generate RSA Key Pair", "Encrypt with RSA", "Decrypt with RSA", "Generate ECDSA Key Pair", "Sign with ECDSA", "Verify with ECDSA"])
     
     if action == "Generate RSA Key Pair":
         if st.button("Generate"):
-            private_key, public_key = rsa_key_pair()
-            st.session_state.private_key = private_key
-            st.session_state.public_key = public_key
+            private_pem, public_pem = rsa_key_pair()
+            st.session_state.private_key = private_pem
+            st.session_state.public_key = public_pem
             st.success("RSA Key Pair Generated!")
-            st.text_area("Public Key:", b64encode(public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo)).decode())
-            st.text_area("Private Key:", b64encode(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption())).decode())
+            st.text_area("Public Key:", public_pem.decode())
+            st.text_area("Private Key:", private_pem.decode())
     
     elif action == "Encrypt with RSA":
         message = st.text_input("Enter message to encrypt:")
@@ -231,6 +287,28 @@ def asymmetric_page():
         if st.button("Decrypt"):
             decrypted_message = rsa_decrypt(st.session_state.private_key, encrypted_message)
             st.success(f"Decrypted Message: {decrypted_message}")
+
+    elif action == "Generate ECDSA Key Pair":
+        if st.button("Generate"):
+            private_pem, public_pem = ecdsa_key_pair()
+            st.session_state.private_key = private_pem
+            st.session_state.public_key = public_pem
+            st.success("ECDSA Key Pair Generated!")
+            st.text_area("Public Key:", public_pem.decode())
+            st.text_area("Private Key:", private_pem.decode())
+
+    elif action == "Sign with ECDSA":
+        message = st.text_input("Enter message to sign:")
+        if st.button("Sign"):
+            signature = ecdsa_sign(st.session_state.private_key, message)
+            st.success(f"Signature: {signature}")
+
+    elif action == "Verify with ECDSA":
+        message = st.text_input("Enter message:")
+        signature = st.text_input("Enter signature to verify:")
+        if st.button("Verify"):
+            verification_result = ecdsa_verify(st.session_state.public_key, message, signature)
+            st.success(verification_result)
 
 # Hashing Page
 def hashing_page():
