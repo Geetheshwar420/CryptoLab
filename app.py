@@ -182,14 +182,16 @@ def symmetric_page():
     encrypt = st.button("Encrypt")
     decrypt = st.button("Decrypt")
 
-    if encrypt:
+    if encrypt and not st.session_state.get("encrypt_clicked", False):
+        st.session_state.encrypt_clicked = True
         try:
             result = symmetric_encrypt(algo, modes.CBC(b64decode(iv.encode())) if iv else None, message, b64decode(key.encode()))
             st.success(f"Encrypted: {result}")
         except Exception as e:
             st.error(f"Error: {e}")
 
-    if decrypt:
+    if decrypt and not st.session_state.get("decrypt_clicked", False):
+        st.session_state.decrypt_clicked = True
         try:
             result = symmetric_decrypt(algo, modes.CBC(b64decode(iv.encode())) if iv else None, message, b64decode(key.encode()))
             st.success(f"Decrypted: {result}")
@@ -206,7 +208,8 @@ def asymmetric_page():
     
     action = st.radio("Select Action:", ["Generate RSA Key Pair", "Encrypt with RSA", "Decrypt with RSA", "Generate ECDSA Key Pair", "Encrypt with ECDSA", "Decrypt with ECDSA"])
     
-    if action == "Generate RSA Key Pair":
+    if action == "Generate RSA Key Pair" and not st.session_state.get("rsa_key_generated", False):
+        st.session_state.rsa_key_generated = True
         if st.button("Generate"):
             private_key, public_key = rsa_key_pair()
             st.session_state.private_key = private_key
@@ -220,15 +223,17 @@ def asymmetric_page():
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
                 encryption_algorithm=serialization.NoEncryption())).decode())
     
-    elif action == "Encrypt with RSA":
+    elif action == "Encrypt with RSA" and not st.session_state.get("rsa_encrypted", False):
         message = st.text_input("Enter message to encrypt:")
         if st.button("Encrypt"):
+            st.session_state.rsa_encrypted = True
             encrypted_message = rsa_encrypt(st.session_state.public_key, message)
             st.success(f"Encrypted Message: {encrypted_message}")
     
-    elif action == "Decrypt with RSA":
+    elif action == "Decrypt with RSA" and not st.session_state.get("rsa_decrypted", False):
         encrypted_message = st.text_input("Enter encrypted message:")
         if st.button("Decrypt"):
+            st.session_state.rsa_decrypted = True
             decrypted_message = rsa_decrypt(st.session_state.private_key, encrypted_message)
             st.success(f"Decrypted Message: {decrypted_message}")
 
@@ -242,11 +247,13 @@ def hashing_page():
     algo = st.selectbox("Choose Algorithm:", ["SHA-256", "SHA-3-256", "MD5", "SHA1", "SHA224", "BLAKE2b", "BLAKE2s"])
     message = st.text_input("Enter message:")
     if st.button("Generate Hash"):
-        try:
-            result = generate_hash(message, algo)
-            st.success(f"Hash: {result}")
-        except Exception as e:
-            st.error(f"Error: {e}")
+        if not st.session_state.get("hash_generated", False):
+            st.session_state.hash_generated = True
+            try:
+                result = generate_hash(message, algo)
+                st.success(f"Hash: {result}")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # Main
 if "current_page" not in st.session_state:
