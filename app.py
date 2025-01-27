@@ -286,9 +286,8 @@ def asymmetric_page():
 
 
 def hashing_page():
-     if st.button("Back to Home"):
+    if st.button("Back to Home"):
         st.session_state.current_page = "Introduction"
-    
     st.title("Hashing Algorithms")
     hash_algo = st.selectbox("Choose a Hashing Algorithm:", ["SHA-256", "SHA-3-256", "MD5", "SHA1", "SHA224", "BLAKE2b", "BLAKE2s"])
     message = st.text_input("Enter message:")
