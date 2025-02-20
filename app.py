@@ -188,7 +188,7 @@ def generate_hash(message, algorithm):
 
 # Streamlit UI
 def introduction():
-    st.title("Comprehensive Cryptography Lab")
+    st.title("Data Encryption Tool ")
     st.write("Explore Symmetric Encryption, Asymmetric Encryption, and Hashing Algorithms.")
     
     category = st.radio("Select a Category to Explore:", ["Symmetric Encryption", "Asymmetric Encryption", "Hashing"], key="category")
