@@ -1,2 +1,15 @@
 streamlit==1.41.1
-cryptography==44.0.0
+
+# Cryptography Libraries
+cryptography>=44.0.0
+python-gnupg==0.5.2
+paramiko>=3.4.0
+dnspython==2.6.1
+
+# Scientific Computing
+numpy==1.26.4
+
+# Additional Dependencies
+bcrypt==4.1.2
+
+pyperclip==1.8.2
