@@ -1,4 +1,5 @@
-streamlit==1.41.1
+# Web Framework
+streamlit==1.20.0
 
 # Cryptography Libraries
 cryptography>=44.0.0
@@ -11,6 +12,9 @@ numpy==1.26.4
 
 # Additional Dependencies
 bcrypt==4.1.2
-
 pyperclip==1.8.2
 pgpy==0.5.0
+
+# Note: distutils is part of the standard library in Python 3. It may need to be installed separately on some systems.
+# For Debian/Ubuntu, you can install it using:
+# sudo apt-get install python3-distutils
