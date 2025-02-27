@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import numpy as np
 from cryptography import x509
 from cryptography.x509.oid import NameOID
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 import gnupg
 import paramiko
 import dns.resolver
@@ -414,9 +414,9 @@ def generate_tls_certificate():
     ).serial_number(
         x509.random_serial_number()
     ).not_valid_before(
-        datetime.now(UTC)
+        datetime.now(timezone.utc)
     ).not_valid_after(
-        datetime.now(UTC) + timedelta(days=365)
+        datetime.now(timezone.utc) + timedelta(days=365)
     ).sign(private_key, hashes.SHA256(), default_backend())
     
     return {
