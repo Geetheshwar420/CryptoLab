@@ -14,4 +14,3 @@ bcrypt==4.1.2
 
 pyperclip==1.8.2
 pgpy==0.5.0
-distutils
