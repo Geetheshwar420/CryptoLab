@@ -24,6 +24,8 @@ import dns.dnssec
 import socket
 import ssl
 import pyperclip  # Add this import at the top of your file
+import pgpy
+import dns.flags
 
 # Symmetric Encryption Algorithms
 def symmetric_encrypt(algorithm, mode, message, key, iv=None):
@@ -435,17 +437,28 @@ def generate_ssh_keypair():
         'private_key': private_key_file.getvalue()
     }
 
+# Function to check if GPG is available
+def check_gpg_availability():
+    try:
+        gpg = gnupg.GPG()
+        if not gpg:
+            raise RuntimeError("GPG is not available. Please install GPG and ensure it is in your PATH.")
+        return gpg
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return None
+
+# PGP Key Generation
 def generate_pgp_keypair(name, email):
-    gpg = gnupg.GPG()
-    input_data = gpg.gen_key_input(
-        key_type="RSA",
-        key_length=2048,
-        name_real=name,
-        name_email=email
-    )
-    key = gpg.gen_key(input_data)
-    public_key = gpg.export_keys(str(key))
-    private_key = gpg.export_keys(str(key), True)
+    # Create a new PGP key
+    key = pgpy.PGPKey.new(pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048)
+    uid = pgpy.PGPUID.new(name, email=email)
+    key.add_uid(uid, usage={pgpy.constants.KeyFlags.Sign, pgpy.constants.KeyFlags.EncryptCommunications}, hashes=[pgpy.constants.HashAlgorithm.SHA256], ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256], compression=[pgpy.constants.CompressionAlgorithm.ZLIB])
+    
+    # Export the public and private keys
+    public_key = str(key.pubkey)
+    private_key = str(key)
+    
     return {
         'public_key': public_key,
         'private_key': private_key
@@ -454,12 +467,20 @@ def generate_pgp_keypair(name, email):
 def verify_dnssec(domain):
     try:
         resolver = dns.resolver.Resolver()
-        resolver.use_dnssec = True
-        answer = resolver.resolve(domain, 'A', want_dnssec=True)
-        return {
-            'secure': answer.response.flags & dns.flags.AD,
-            'authenticated': bool(answer.response.flags & dns.flags.AD)
-        }
+        resolver.use_dnssec = True  # Enable DNSSEC
+        answer = resolver.resolve(domain, 'A')  # Query for A records
+
+        # Check if the response is authenticated
+        if answer.response.flags & dns.flags.AD:
+            return {
+                'secure': True,
+                'authenticated': True
+            }
+        else:
+            return {
+                'secure': False,
+                'authenticated': False
+            }
     except Exception as e:
         return {'error': str(e)}
 
@@ -489,14 +510,28 @@ def symmetric_page():
     mode = "CBC" if algo in ["AES", "DES", "ChaCha20"] else None
     st.write(f"Mode: {mode}")  # Display the selected mode
 
-    message = st.text_input("Enter plaintext:")
+    # File uploader for plaintext
+    uploaded_file = st.file_uploader("Upload a text file containing plaintext", type=["txt"])
     
+    # Initialize message variable
+    message = ""
+
+    if uploaded_file is not None:
+        # Read the content of the uploaded file
+        message = uploaded_file.read().decode("utf-8")
+        st.text_area("Plaintext from file:", message, height=200)  # Display the plaintext
+
+    # Manual input field for plaintext
+    manual_input = st.text_area("Or enter plaintext manually:", height=200)
+
+    # Combine the uploaded file content and manual input
+    if manual_input:
+        message = manual_input  # Use manual input if provided
+
     # Initialize key in session state if not already done
     if 'key' not in st.session_state:
         st.session_state.key = ""
 
-    key = st.text_input("Enter key (16 bytes for AES, 8/24 bytes for DES, 32 bytes for ChaCha20):", type="password", value=st.session_state.key)
-    
     # Button to generate a random key
     if st.button("Generate Key"):
         if algo == "AES":
@@ -511,10 +546,12 @@ def symmetric_page():
             st.session_state.key = base64.b64encode(os.urandom(16)).decode()  # 16 bytes for Blowfish
         elif algo == "CAST5":
             st.session_state.key = base64.b64encode(os.urandom(16)).decode()  # 16 bytes for CAST5
-        st.success(f"Generated Key: {st.session_state.key}")
+        
+        # Update the key input field with the generated key
+        key = st.session_state.key  # Update the key variable to reflect the generated key
 
     # Display the generated key in the input field
-    key = st.session_state.key
+    st.text_input("Generated Key:", value=st.session_state.key, disabled=True)  # Display the generated key as read-only
 
     # Generate IV automatically for applicable algorithms
     iv = None
@@ -528,20 +565,22 @@ def symmetric_page():
     with col1:
         if st.button("Encrypt"):
             try:
-                result = symmetric_encrypt(algo, modes.CBC(base64.b64decode(iv.encode())) if iv else None, message, base64.b64decode(key.encode()))
-                encrypted_output = st.text_area("Encrypted Output", result, height=100)  # Output for copying
-                if st.button("Copy Encrypted Output"):
-                    pyperclip.copy(encrypted_output)  # Copy to clipboard
+                if message:  # Ensure there is a message to encrypt
+                    result = symmetric_encrypt(algo, modes.CBC(base64.b64decode(iv.encode())) if iv else None, message, base64.b64decode(st.session_state.key.encode()))
+                    st.text_area("Encrypted Output", result, height=100)  # Output for copying
+                else:
+                    st.error("Please upload a text file containing plaintext or enter plaintext manually.")
             except Exception as e:
                 st.error(f"Error: {e}")
 
     with col2:
         if st.button("Decrypt"):
             try:
-                result = symmetric_decrypt(algo, modes.CBC(base64.b64decode(iv.encode())) if iv else None, message, base64.b64decode(key.encode()))
-                decrypted_output = st.text_area("Decrypted Output", result, height=100)  # Output for copying
-                if st.button("Copy Decrypted Output"):
-                    pyperclip.copy(decrypted_output)  # Copy to clipboard
+                if message:  # Ensure there is a message to decrypt
+                    result = symmetric_decrypt(algo, modes.CBC(base64.b64decode(iv.encode())) if iv else None, message, base64.b64decode(st.session_state.key.encode()))
+                    st.text_area("Decrypted Output", result, height=100)  # Output for copying
+                else:
+                    st.error("Please upload a text file containing plaintext or enter plaintext manually.")
             except Exception as e:
                 st.error(f"Error: {e}")
 
@@ -555,6 +594,24 @@ def asymmetric_page():
     st.title("Asymmetric Encryption (RSA & ECDSA)")
     action = st.radio("Select Action:", ["Generate RSA Key Pair", "Generate ECDSA Key Pair", "Sign with RSA", "Verify with RSA", "Sign with ECDSA", "Verify with ECDSA"])
 
+    # File uploader for plaintext
+    uploaded_file = st.file_uploader("Upload a text file containing plaintext for signing", type=["txt"])
+    
+    # Initialize message variable
+    message = ""
+
+    if uploaded_file is not None:
+        # Read the content of the uploaded file
+        message = uploaded_file.read().decode("utf-8")
+        st.text_area("Plaintext from file:", message, height=200)  # Display the plaintext
+
+    # Manual input field for plaintext
+    manual_input = st.text_area("Or enter plaintext manually:", height=200)
+
+    # Combine the uploaded file content and manual input
+    if manual_input:
+        message = manual_input  # Use manual input if provided
+
     if action == "Generate RSA Key Pair":
         if st.button("Generate"):
             private_key, private_pem, public_pem = rsa_key_pair()
@@ -564,6 +621,14 @@ def asymmetric_page():
             st.text_area("Public Key:", base64.b64encode(public_pem).decode())
             st.text_area("Private Key:", base64.b64encode(private_pem).decode())
 
+    elif action == "Sign with RSA":
+        if st.button("Sign"):
+            if message:  # Ensure there is a message to sign
+                signature = rsa_sign(st.session_state.private_key, message)
+                st.text_area("Signature Output", signature, height=100)  # Output for copying
+            else:
+                st.error("Please upload a text file containing plaintext or enter plaintext manually.")
+
     elif action == "Generate ECDSA Key Pair":
         if st.button("Generate"):
             private_key, private_pem, public_pem = ecdsa_key_pair()
@@ -572,14 +637,6 @@ def asymmetric_page():
             st.success("ECDSA Key Pair Generated!")
             st.text_area("Public Key:", base64.b64encode(public_pem).decode())
             st.text_area("Private Key:", base64.b64encode(private_pem).decode())
-
-    elif action == "Sign with RSA":
-        message = st.text_input("Enter message to sign:")
-        if st.button("Sign"):
-            signature = rsa_sign(st.session_state.private_key, message)
-            st.text_area("Signature Output", signature, height=100)  # Output for copying
-            if st.button("Copy Signature Output"):
-                pyperclip.copy(signature)  # Copy to clipboard
 
     elif action == "Verify with RSA":
         message = st.text_input("Enter message to verify:")
@@ -599,8 +656,6 @@ def asymmetric_page():
         if st.button("Sign"):
             signature = ecdsa_sign(st.session_state.private_key, message)
             st.text_area("Signature Output", signature, height=100)  # Output for copying
-            if st.button("Copy Signature Output"):
-                pyperclip.copy(signature)  # Copy to clipboard
 
     elif action == "Verify with ECDSA":
         message = st.text_input("Enter message to verify:")
@@ -623,13 +678,24 @@ def hashing_page():
         st.session_state.current_page = "Introduction"
     st.title("Hashing Algorithms")
     hash_algo = st.selectbox("Choose a Hashing Algorithm:", ["SHA-256", "SHA-3-256", "MD5", "SHA1", "SHA224", "BLAKE2b", "BLAKE2s"])
-    message = st.text_input("Enter message:")
+
+    # File uploader for plaintext
+    uploaded_file = st.file_uploader("Upload a text file containing message for hashing", type=["txt"])
+    
+    # Initialize message variable
+    message = ""
+
+    if uploaded_file is not None:
+        # Read the content of the uploaded file
+        message = uploaded_file.read().decode("utf-8")
+        st.text_area("Message from file:", message, height=200)  # Display the message
+
     if st.button("Generate Hash"):
-        hash_value = generate_hash(message, hash_algo)
-        st.text_area("Hash Output", hash_value, height=100)  # Output for copying
-        if st.button("Copy Hash Output"):
-            pyperclip.copy(hash_value)  # Copy to clipboard
-            st.success("Hash output copied to clipboard!")
+        if message:  # Ensure there is a message to hash
+            hash_value = generate_hash(message, hash_algo)
+            st.text_area("Hash Output", hash_value, height=100)  # Output for copying
+        else:
+            st.error("Please upload a text file containing a message.")
 
 
 def basic_crypto_page():
@@ -642,8 +708,24 @@ def basic_crypto_page():
         ["Caesar", "Vigenère", "Playfair", "Hill", "Autokey", "Rail Fence"]
     )
     
-    text = st.text_area("Enter text:")
+    # File uploader for plaintext
+    uploaded_file = st.file_uploader("Upload a text file containing text for encryption/decryption", type=["txt"])
     
+    # Initialize text variable
+    text = ""
+
+    if uploaded_file is not None:
+        # Read the content of the uploaded file
+        text = uploaded_file.read().decode("utf-8")
+        st.text_area("Text from file:", text, height=200)  # Display the text
+
+    # Manual input field for text
+    manual_input = st.text_area("Or enter text manually:", height=200)
+
+    # Combine the uploaded file content and manual input
+    if manual_input:
+        text = manual_input  # Use manual input if provided
+
     if algo == "Caesar":
         key = st.number_input("Enter shift (0-25):", min_value=0, max_value=25)
     elif algo == "Rail Fence":
@@ -657,42 +739,44 @@ def basic_crypto_page():
     with col1:
         if st.button("Encrypt"):
             try:
-                if algo == "Caesar":
-                    result = caesar_cipher(text, key, False)
-                elif algo == "Vigenère":
-                    result = vigenere_cipher(text, key, False)
-                elif algo == "Playfair":
-                    result = playfair_cipher(text, key, False)
-                elif algo == "Hill":
-                    result = hill_cipher(text, key, False)
-                elif algo == "Autokey":
-                    result = autokey_cipher(text, key, False)
-                elif algo == "Rail Fence":
-                    result = rail_fence_cipher(text, key, False)
-                st.text_area("Encrypted Output", result, height=100)  # Output for copying
-                if st.button("Copy Encrypted Output"):
-                    pyperclip.copy(result)  # Copy to clipboard
+                if text:  # Ensure there is text to encrypt
+                    if algo == "Caesar":
+                        result = caesar_cipher(text, key, False)
+                    elif algo == "Vigenère":
+                        result = vigenere_cipher(text, key, False)
+                    elif algo == "Playfair":
+                        result = playfair_cipher(text, key, False)
+                    elif algo == "Hill":
+                        result = hill_cipher(text, key, False)
+                    elif algo == "Autokey":
+                        result = autokey_cipher(text, key, False)
+                    elif algo == "Rail Fence":
+                        result = rail_fence_cipher(text, key, False)
+                    st.text_area("Encrypted Output", result, height=100)  # Output for copying
+                else:
+                    st.error("Please upload a text file containing text or enter text manually.")
             except Exception as e:
                 st.error(f"Error: {e}")
     
     with col2:
         if st.button("Decrypt"):
             try:
-                if algo == "Caesar":
-                    result = caesar_cipher(text, key, True)
-                elif algo == "Vigenère":
-                    result = vigenere_cipher(text, key, True)
-                elif algo == "Playfair":
-                    result = playfair_cipher(text, key, True)
-                elif algo == "Hill":
-                    result = hill_cipher(text, key, True)
-                elif algo == "Autokey":
-                    result = autokey_cipher(text, key, True)
-                elif algo == "Rail Fence":
-                    result = rail_fence_cipher(text, key, True)
-                st.text_area("Decrypted Output", result, height=100)  # Output for copying
-                if st.button("Copy Decrypted Output"):
-                    pyperclip.copy(result)  # Copy to clipboard
+                if text:  # Ensure there is text to decrypt
+                    if algo == "Caesar":
+                        result = caesar_cipher(text, key, True)
+                    elif algo == "Vigenère":
+                        result = vigenere_cipher(text, key, True)
+                    elif algo == "Playfair":
+                        result = playfair_cipher(text, key, True)
+                    elif algo == "Hill":
+                        result = hill_cipher(text, key, True)
+                    elif algo == "Autokey":
+                        result = autokey_cipher(text, key, True)
+                    elif algo == "Rail Fence":
+                        result = rail_fence_cipher(text, key, True)
+                    st.text_area("Decrypted Output", result, height=100)  # Output for copying
+                else:
+                    st.error("Please upload a text file containing text or enter text manually.")
             except Exception as e:
                 st.error(f"Error: {e}")
 
@@ -710,14 +794,8 @@ def protocols_page():
         if st.button("Generate TLS Certificate"):
             try:
                 result = generate_tls_certificate()
-                cert_output = st.text_area("Certificate:", result['certificate'])
-                private_key_output = st.text_area("Private Key:", result['private_key'])
-                if st.button("Copy Certificate"):
-                    pyperclip.copy(result['certificate'])  # Copy to clipboard
-                    st.success("Certificate copied to clipboard!")
-                if st.button("Copy Private Key"):
-                    pyperclip.copy(result['private_key'])  # Copy to clipboard
-                    st.success("Private key copied to clipboard!")
+                st.text_area("Certificate:", result['certificate'], height=200)  # Output for copying
+                st.text_area("Private Key:", result['private_key'], height=200)  # Output for copying
             except Exception as e:
                 st.error(f"Error: {e}")
                 
@@ -725,14 +803,8 @@ def protocols_page():
         if st.button("Generate SSH Key Pair"):
             try:
                 result = generate_ssh_keypair()
-                public_key_output = st.text_area("Public Key:", result['public_key'])
-                private_key_output = st.text_area("Private Key:", result['private_key'])
-                if st.button("Copy Public Key"):
-                    pyperclip.copy(result['public_key'])  # Copy to clipboard
-                    st.success("Public key copied to clipboard!")
-                if st.button("Copy Private Key"):
-                    pyperclip.copy(result['private_key'])  # Copy to clipboard
-                    st.success("Private key copied to clipboard!")
+                st.text_area("Public Key:", result['public_key'], height=200)  # Output for copying
+                st.text_area("Private Key:", result['private_key'], height=200)  # Output for copying
             except Exception as e:
                 st.error(f"Error: {e}")
                 
@@ -740,27 +812,19 @@ def protocols_page():
         name = st.text_input("Name:")
         email = st.text_input("Email:")
         if st.button("Generate PGP Key Pair"):
-            try:
-                result = generate_pgp_keypair(name, email)
-                public_key_output = st.text_area("Public Key:", result['public_key'])
-                private_key_output = st.text_area("Private Key:", result['private_key'])
-                if st.button("Copy Public Key"):
-                    pyperclip.copy(result['public_key'])  # Copy to clipboard
-                    st.success("Public key copied to clipboard!")
-                if st.button("Copy Private Key"):
-                    pyperclip.copy(result['private_key'])  # Copy to clipboard
-                    st.success("Private key copied to clipboard!")
-            except Exception as e:
-                st.error(f"Error: {e}")
+            result = generate_pgp_keypair(name, email)
+            st.text_area("Public Key:", result['public_key'], height=200)  # Output for copying
+            st.text_area("Private Key:", result['private_key'], height=200)  # Output for copying
                 
     elif protocol == "DNSSEC":
         domain = st.text_input("Domain:")
         if st.button("Verify DNSSEC"):
-            try:
-                result = verify_dnssec(domain)
-                st.json(result)
-            except Exception as e:
-                st.error(f"Error: {e}")
+            result = verify_dnssec(domain)
+            if 'error' in result:
+                st.error(f"Error: {result['error']}")
+            else:
+                st.success("DNSSEC Verification Result:")
+                st.json(result)  # Display the result in JSON format
 
 # Main function to control navigation
 def main():
