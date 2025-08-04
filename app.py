@@ -24,7 +24,6 @@ import dns.dnssec
 import socket
 import ssl
 import pyperclip  # Add this import at the top of your file
-import pgpy
 import dns.flags
 
 # Symmetric Encryption Algorithms
@@ -450,18 +449,26 @@ def check_gpg_availability():
 
 # PGP Key Generation
 def generate_pgp_keypair(name, email):
-    # Create a new PGP key
-    key = pgpy.PGPKey.new(pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048)
-    uid = pgpy.PGPUID.new(name, email=email)
-    key.add_uid(uid, usage={pgpy.constants.KeyFlags.Sign, pgpy.constants.KeyFlags.EncryptCommunications}, hashes=[pgpy.constants.HashAlgorithm.SHA256], ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256], compression=[pgpy.constants.CompressionAlgorithm.ZLIB])
+    gpg = gnupg.GPG()
     
-    # Export the public and private keys
-    public_key = str(key.pubkey)
-    private_key = str(key)
+    input_data = gpg.gen_key_input(
+        name_real=name,
+        name_email=email,
+        key_type="RSA",
+        key_length=2048,
+        expire_date="1y"
+    )
+    key = gpg.gen_key(input_data)
     
+    if not key:
+        return {"error": "Key generation failed. Ensure GPG is properly installed and in your PATH."}
+    
+    public_key = gpg.export_keys(key.fingerprint)
+    private_key = gpg.export_keys(key.fingerprint, True)
+
     return {
-        'public_key': public_key,
-        'private_key': private_key
+        "public_key": public_key,
+        "private_key": private_key
     }
 
 def verify_dnssec(domain):
@@ -849,3 +856,4 @@ def main():
 # Run the application
 if __name__ == "__main__":
     main()
+
