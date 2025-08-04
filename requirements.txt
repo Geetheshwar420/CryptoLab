@@ -2,7 +2,7 @@
 streamlit==1.20.0
 
 # Cryptography Libraries
-cryptography>=3.4.8
+cryptography==39.0.1
 python-gnupg==0.5.2
 paramiko>=3.4.0
 dnspython==2.6.1
@@ -18,3 +18,4 @@ pgpy==0.5.0
 # Note: distutils is part of the standard library in Python 3. It may need to be installed separately on some systems.
 # For Debian/Ubuntu, you can install it using:
 # sudo apt-get install python3-distutils
+
